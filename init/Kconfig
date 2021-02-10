@@ -1535,6 +1535,14 @@ config PRINTK_NMI
 	depends on PRINTK
 	depends on HAVE_NMI
 
+config PRINTK_DISABLE_MSG
+	bool "Suppress printk messages in certain drivers"
+	default y
+	depends on PRINTK
+	help
+	  Enabling this will suppress printk messages in drivers where
+	  the printk_disable_msg.h header file is included.
+
 config BUG
 	bool "BUG() support" if EXPERT
 	default y
