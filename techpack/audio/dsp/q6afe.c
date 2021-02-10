@@ -30,6 +30,8 @@
 #include "adsp_err.h"
 #include "q6afecal-hwdep.h"
 
+#include <linux/printk_disable_msg.h>
+
 #define WAKELOCK_TIMEOUT	5000
 enum {
 	AFE_COMMON_RX_CAL = 0,

@@ -21,6 +21,8 @@
 #include <ipc/apr.h>
 #include "adsp_err.h"
 
+#include <linux/printk_disable_msg.h>
+
 #define TIMEOUT_MS 1000
 
 #define RESET_COPP_ID 99

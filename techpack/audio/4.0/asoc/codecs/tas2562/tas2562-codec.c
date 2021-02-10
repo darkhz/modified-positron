@@ -53,6 +53,8 @@
 #define TAS2562_IVSENSER_DISABLE 0
 /* #define TAS2558_CODEC */
 
+#include <linux/printk_disable_msg.h>
+
 static char p_icn[] = {0x00, 0x00, 0x2f, 0x2c};//2019.12.06 longcheer lixiaona add for AUD test spk no signal
 static char const *iv_enable_text[] = {"Off", "On"};
 static int tas2562iv_enable;

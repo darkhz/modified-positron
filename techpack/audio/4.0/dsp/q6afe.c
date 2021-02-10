@@ -27,6 +27,8 @@ static int32_t tas_smartamp_algo_callback(uint32_t opcode, uint32_t *payload,
 				    uint32_t payload_size);
 #endif /*CONFIG_TAS25XX_ALGO*/
 
+#include <linux/printk_disable_msg.h>
+
 #define WAKELOCK_TIMEOUT	5000
 #define AFE_CLK_TOKEN	1024
 enum {

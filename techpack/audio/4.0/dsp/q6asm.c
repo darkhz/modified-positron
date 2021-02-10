@@ -42,6 +42,8 @@
 #include <dsp/q6core.h>
 #include "adsp_err.h"
 
+#include <linux/printk_disable_msg.h>
+
 #define TIMEOUT_MS  1000
 #define TRUE        0x01
 #define FALSE       0x00

@@ -43,6 +43,8 @@
 #include <dsp/tas_smart_amp_v2.h>
 #endif /*CONFIG_TAS25XX_ALGO*/
 
+#include <linux/printk_disable_msg.h>
+
 static char p_icn[] = {0x00, 0x00, 0x2f, 0x2c};
 
 static int tas2562_regmap_write(struct tas2562_priv *p_tas2562,
