@@ -33,6 +33,8 @@
 #include <linux/msm-bus-board.h>
 #include "governor_bw_hwmon.h"
 
+#include <linux/printk_disable_msg.h>
+
 #define GLB_INT_STATUS(m)	((m)->global_base + 0x100)
 #define GLB_INT_CLR(m)		((m)->global_base + 0x108)
 #define	GLB_INT_EN(m)		((m)->global_base + 0x10C)

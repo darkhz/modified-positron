@@ -60,6 +60,8 @@ EXPORT_SYMBOL(g_touchscreen_usb_pulgin);
 				__func__, ##__VA_ARGS__);	\
 	} while (0)
 
+#include <linux/printk_disable_msg.h>
+
 #define typec_rp_med_high(chg, typec_mode)			\
 	((typec_mode == POWER_SUPPLY_TYPEC_SOURCE_MEDIUM	\
 	|| typec_mode == POWER_SUPPLY_TYPEC_SOURCE_HIGH)	\
@@ -1280,6 +1282,8 @@ static int smblib_request_dpdm(struct smb_charger *chg, bool enable)
 	return rc;
 }
 
+#if 0
+
 #define PERIPHERAL_MASK		0xFF
 static u16 peripheral_base;
 static char log[256] = "";
@@ -1357,6 +1361,8 @@ static void dump_regs(struct smb_charger *chg)
 	dump_reg(chg, TYPEC_BASE + 0x44, "TYPEC MODE CFG");
 	dump_reg(chg, TYPEC_BASE + addr, NULL);
 }
+
+#endif
 
 void smblib_rerun_apsd(struct smb_charger *chg)
 {
@@ -2759,7 +2765,9 @@ static void smblib_reg_work(struct work_struct *work)
 	int icl_settle, usb_cur_in, usb_vol_in, icl_sts;
 	int charger_type, typec_mode, typec_orientation, resistance_now;
 
+#if 0
 	dump_regs(chg);
+#endif
 	rc = smblib_get_prop_usb_present(chg, &val);
 	if (rc < 0) {
 		pr_err("Couldn't get usb present rc=%d\n", rc);

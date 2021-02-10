@@ -21,6 +21,8 @@
 
 #include <linux/pmic-voter.h>
 
+#include <linux/printk_disable_msg.h>
+
 #define NUM_MAX_CLIENTS		32
 #define DEBUG_FORCE_CLIENT	"DEBUG_FORCE_CLIENT"
 

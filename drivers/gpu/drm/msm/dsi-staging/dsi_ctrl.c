@@ -33,6 +33,8 @@
 
 #include "sde_dbg.h"
 
+#include <linux/printk_disable_msg.h>
+
 #define DSI_CTRL_DEFAULT_LABEL "MDSS DSI CTRL"
 
 #define DSI_CTRL_TX_TO_MS     200

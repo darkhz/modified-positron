@@ -41,6 +41,8 @@
 #define pr_debug pr_err
 #endif
 
+#include <linux/printk_disable_msg.h>
+
 union power_supply_propval lct_therm_lvl_reserved;
 union power_supply_propval lct_therm_level;
 

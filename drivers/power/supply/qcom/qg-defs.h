@@ -21,6 +21,8 @@
 			pr_debug(fmt, ##__VA_ARGS__);	\
 	} while (0)
 
+#include <linux/printk_disable_msg.h>
+
 #define is_between(left, right, value) \
 		(((left) >= (right) && (left) >= (value) \
 			&& (value) >= (right)) \

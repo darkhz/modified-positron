@@ -26,6 +26,8 @@
 #include "msm_vidc_clocks.h"
 #include <linux/dma-buf.h>
 
+#include <linux/printk_disable_msg.h>
+
 #define MAX_EVENTS 30
 
 static int try_get_ctrl(struct msm_vidc_inst *inst,

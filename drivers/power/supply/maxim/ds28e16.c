@@ -32,6 +32,8 @@
 #include <linux/regmap.h>
 #include <linux/random.h>
 
+#include <linux/printk_disable_msg.h>
+
 #ifdef CONFIG_TARGET_PROJECT_J20C
 #define ds_info	pr_err
 #define ds_dbg	pr_err

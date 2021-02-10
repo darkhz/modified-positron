@@ -42,6 +42,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/rpmh.h>
 
+#include <linux/printk_disable_msg.h>
+
 #define RSC_DRV_IPC_LOG_SIZE		2
 
 #define MAX_CMDS_PER_TCS		16

@@ -40,6 +40,8 @@
 #include "sde_irq.h"
 #include "sde_core_perf.h"
 
+#include <linux/printk_disable_msg.h>
+
 #define DRMID(x) ((x) ? (x)->base.id : -1)
 
 /**

@@ -22,6 +22,7 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/irqdesc.h>
+#include <linux/printk_disable_msg.h>
 
 #include "power.h"
 

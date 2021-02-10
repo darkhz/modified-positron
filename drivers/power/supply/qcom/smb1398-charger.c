@@ -17,6 +17,7 @@
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
 #include <linux/iio/consumer.h>
+#include <linux/printk_disable_msg.h>
 
 /* Status register definition */
 #define INPUT_STATUS_REG		0x2609
