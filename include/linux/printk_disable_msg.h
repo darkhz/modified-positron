@@ -24,4 +24,10 @@
 #define dev_err(dev, fmt, ...)
 #define dev_err_ratelimited(dev, fmt, ...)
 
+#undef qg_dbg
+#undef smblib_dbg
+
+#define qg_dbg(chip, reason, fmt, ...)
+#define smblib_dbg(chg, reason, fmt, ...)
+
 #endif
