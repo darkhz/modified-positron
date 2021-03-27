@@ -13,6 +13,8 @@
 #include <linux/irq.h>
 #include <linux/cpumask.h>
 
+#include <linux/printk_disable_msg.h>
+
 #include "internals.h"
 
 /* For !GENERIC_IRQ_EFFECTIVE_AFF_MASK this looks at general affinity mask */

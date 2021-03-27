@@ -19,6 +19,7 @@
 #include <linux/sched_clock.h>
 #include <linux/seqlock.h>
 #include <linux/bitops.h>
+#include <linux/printk_disable_msg.h>
 
 /**
  * struct clock_read_data - data required to read from sched_clock()
