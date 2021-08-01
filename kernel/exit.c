@@ -548,8 +548,12 @@ static void exit_mm(void)
 	mm_update_next_owner(mm);
 
 	mm_released = mmput(mm);
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	clear_thread_flag(TIF_MEMDIE);
+#else
 	if (test_thread_flag(TIF_MEMDIE))
 		exit_oom_victim();
+#endif
 	if (mm_released)
 		set_tsk_thread_flag(current, TIF_MM_RELEASED);
 }
@@ -776,6 +780,32 @@ static void check_stack_usage(void)
 }
 #else
 static inline void check_stack_usage(void) {}
+#endif
+
+#ifndef CONFIG_PROFILING
+static BLOCKING_NOTIFIER_HEAD(task_exit_notifier);
+
+int profile_event_register(enum profile_type t, struct notifier_block *n)
+{
+	if (t == PROFILE_TASK_EXIT)
+		return blocking_notifier_chain_register(&task_exit_notifier, n);
+
+	return -ENOSYS;
+}
+
+int profile_event_unregister(enum profile_type t, struct notifier_block *n)
+{
+	if (t == PROFILE_TASK_EXIT)
+		return blocking_notifier_chain_unregister(&task_exit_notifier,
+							  n);
+
+	return -ENOSYS;
+}
+
+void profile_task_exit(struct task_struct *tsk)
+{
+	blocking_notifier_call_chain(&task_exit_notifier, 0, tsk);
+}
 #endif
 
 void __noreturn do_exit(long code)

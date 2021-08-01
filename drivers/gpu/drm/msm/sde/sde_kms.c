@@ -81,7 +81,6 @@ static const char * const iommu_ports[] = {
 #define SDE_KMS_MODESET_LOCK_TIMEOUT_US 500
 #define SDE_KMS_MODESET_LOCK_MAX_TRIALS 20
 
-#define SDE_KMS_PM_QOS_CPU_DMA_LATENCY 300
 /**
  * sdecustom - enable certain driver customizations for sde clients
  *	Enabling this modifies the standard DRM behavior slightly and assumes
@@ -2697,7 +2696,7 @@ static int sde_kms_get_mixer_count(const struct msm_kms *kms,
 			mode->hdisplay > max_mixer_width) {
 		*num_lm = 2;
 		if ((mode_clock_hz >> 1) > max_mdp_clock_hz) {
-			SDE_DEBUG("[%s] clock %d exceeds max_mdp_clk %d\n",
+			SDE_DEBUG("[%s] clock %lld exceeds max_mdp_clk %lld\n",
 					mode->name, mode_clock_hz,
 					max_mdp_clock_hz);
 			return -EINVAL;
@@ -2758,17 +2757,33 @@ retry:
 	}
 
 	crtc_state = drm_atomic_get_crtc_state(state, enc->crtc);
+	if (IS_ERR(crtc_state)) {
+		SDE_ERROR("error %ld getting crtc %d state\n",
+			  PTR_ERR(crtc_state), DRMID(conn));
+		goto end;
+	}
+
 	conn_state = drm_atomic_get_connector_state(state, conn);
 	if (IS_ERR(conn_state)) {
-		SDE_ERROR("error %d getting connector %d state\n",
-				ret, DRMID(conn));
+		SDE_ERROR("error %ld getting connector %d state\n",
+			  PTR_ERR(conn_state), DRMID(conn));
 		goto end;
 	}
 
 	crtc_state->active = true;
-	drm_atomic_set_crtc_for_connector(conn_state, enc->crtc);
+	ret = drm_atomic_set_crtc_for_connector(conn_state, enc->crtc);
+	if (ret) {
+		SDE_ERROR("error %d setting crtc for connector %d\n", ret,
+			  DRMID(conn));
+		goto end;
+	}
 
-	drm_atomic_commit(state);
+	ret = drm_atomic_commit(state);
+	if (ret) {
+		SDE_ERROR("error %d committing state for connector %d\n", ret,
+			  DRMID(conn));
+		goto end;
+	}
 end:
 	if (state)
 		drm_atomic_state_put(state);
@@ -3169,17 +3184,6 @@ static void _sde_kms_set_lutdma_vbif_remap(struct sde_kms *sde_kms)
 	sde_vbif_set_qos_remap(sde_kms, &qos_params);
 }
 
-static void kms_update_pm_qos(struct pm_qos_request *pm_qos_irq_req, bool enable)
-{
-	if (!pm_qos_request_active(pm_qos_irq_req))
-		return;
-
-	if (enable)
-		pm_qos_update_request(pm_qos_irq_req, SDE_KMS_PM_QOS_CPU_DMA_LATENCY);
-	else
-		pm_qos_update_request(pm_qos_irq_req, PM_QOS_DEFAULT_VALUE);
-}
-
 static void sde_kms_handle_power_event(u32 event_type, void *usr)
 {
 	struct sde_kms *sde_kms = usr;
@@ -3198,9 +3202,7 @@ static void sde_kms_handle_power_event(u32 event_type, void *usr)
 		sde_kms_init_shared_hw(sde_kms);
 		_sde_kms_set_lutdma_vbif_remap(sde_kms);
 		sde_kms->first_kickoff = true;
-		kms_update_pm_qos(&sde_kms->pm_qos_irq_req, true);
 	} else if (event_type == SDE_POWER_EVENT_PRE_DISABLE) {
-		kms_update_pm_qos(&sde_kms->pm_qos_irq_req, false);
 		sde_irq_update(msm_kms, false);
 		sde_kms->first_kickoff = false;
 	}
@@ -3597,7 +3599,7 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 	sde_kms->hw_sid = sde_hw_sid_init(sde_kms->sid,
 				sde_kms->sid_len, sde_kms->catalog);
 	if (IS_ERR(sde_kms->hw_sid)) {
-		SDE_ERROR("failed to init sid %d\n", PTR_ERR(sde_kms->hw_sid));
+		SDE_ERROR("failed to init sid %ld\n", PTR_ERR(sde_kms->hw_sid));
 		sde_kms->hw_sid = NULL;
 		goto power_error;
 	}
@@ -3655,12 +3657,6 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 		sde_power_resource_enable(&priv->phandle,
 						sde_kms->core_client, false);
 	}
-
-	sde_kms->pm_qos_irq_req.type = PM_QOS_REQ_AFFINE_IRQ;
-	sde_kms->pm_qos_irq_req.irq = platform_get_irq(to_platform_device(sde_kms->dev->dev), 0);
-	pm_qos_add_request(&sde_kms->pm_qos_irq_req, PM_QOS_CPU_DMA_LATENCY,
-					SDE_KMS_PM_QOS_CPU_DMA_LATENCY);
-
 	return 0;
 
 genpd_err:

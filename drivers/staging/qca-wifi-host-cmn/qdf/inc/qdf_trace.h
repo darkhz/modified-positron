@@ -1279,11 +1279,11 @@ struct category_name_info {
  * Return: nothing
  *
  */
-void qdf_trace_msg_cmn(unsigned int idx,
+static inline void qdf_trace_msg_cmn(unsigned int idx,
 			QDF_MODULE_ID category,
 			QDF_TRACE_LEVEL verbose,
 			const char *str_format,
-			va_list val);
+			va_list val) {}
 
 /**
  * struct qdf_print_ctrl: QDF Print Control structure

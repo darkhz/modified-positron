@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1557,14 +1557,14 @@ void qdf_dp_log_proto_pkt_info(uint8_t *sa, uint8_t *da, uint8_t type,
 		last_ticks_rx[subtype] = curr_ticks;
 
 	if (status == QDF_TX_RX_STATUS_INVALID)
-		qdf_nofl_info("%s %s: SA:"QDF_MAC_ADDR_FMT" DA:"QDF_MAC_ADDR_FMT,
+		qdf_nofl_info("%s %s: SA:" QDF_MAC_ADDR_FMT " DA:" QDF_MAC_ADDR_FMT,
 			      qdf_get_pkt_type_string(type, subtype),
-			      dir ? "RX":"TX", QDF_MAC_ADDR_REF(sa),
+			      dir ? "RX" : "TX", QDF_MAC_ADDR_REF(sa),
 			      QDF_MAC_ADDR_REF(da));
 	else
-		qdf_nofl_info("%s %s: SA:"QDF_MAC_ADDR_FMT" DA:"QDF_MAC_ADDR_FMT" msdu_id:%d status: %s",
+		qdf_nofl_info("%s %s: SA:" QDF_MAC_ADDR_FMT " DA:" QDF_MAC_ADDR_FMT " msdu_id:%d status: %s",
 			      qdf_get_pkt_type_string(type, subtype),
-			      dir ? "RX":"TX", QDF_MAC_ADDR_REF(sa),
+			      dir ? "RX" : "TX", QDF_MAC_ADDR_REF(sa),
 			      QDF_MAC_ADDR_REF(da), msdu_id,
 			      qdf_get_pkt_status_string(status));
 }
@@ -3209,6 +3209,7 @@ static inline void print_to_console(char *str_buffer)
 #define print_to_console(str)
 #endif
 
+#if 0
 #ifdef MULTI_IF_NAME
 static const char *qdf_trace_wlan_modname(void)
 {
@@ -3293,6 +3294,7 @@ void qdf_trace_msg_cmn(unsigned int idx,
 	}
 }
 qdf_export_symbol(qdf_trace_msg_cmn);
+#endif
 
 QDF_STATUS qdf_print_setup(void)
 {
@@ -3740,6 +3742,7 @@ void qdf_log_dump_at_kernel_level(bool enable)
 
 qdf_export_symbol(qdf_log_dump_at_kernel_level);
 
+#if 0
 bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 {
 	QDF_TRACE_LEVEL verbose_mask;
@@ -3771,6 +3774,7 @@ bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 		return true;
 }
 qdf_export_symbol(qdf_print_is_category_enabled);
+#endif
 
 bool qdf_print_is_verbose_enabled(unsigned int idx, QDF_MODULE_ID category,
 				  QDF_TRACE_LEVEL verbose)

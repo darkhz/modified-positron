@@ -41,7 +41,6 @@
 #include <linux/list_sort.h>
 #include <linux/hashtable.h>
 #include <linux/mount.h>
-#include <linux/dcache.h>
 
 #include <uapi/linux/dma-buf.h>
 #include <uapi/linux/magic.h>
@@ -70,70 +69,28 @@ struct dma_proc {
 
 static struct dma_buf_list db_list;
 
-static void dmabuf_dent_put(struct dma_buf *dmabuf)
-{
-	if (atomic_dec_and_test(&dmabuf->dent_count)) {
-		kfree(dmabuf->name);
-		kfree(dmabuf);
-	}
-}
-
-
 static char *dmabuffs_dname(struct dentry *dentry, char *buffer, int buflen)
 {
 	struct dma_buf *dmabuf;
 	char name[DMA_BUF_NAME_LEN];
 	size_t ret = 0;
 
-	spin_lock(&dentry->d_lock);
 	dmabuf = dentry->d_fsdata;
-	if (!dmabuf || !atomic_add_unless(&dmabuf->dent_count, 1, 0)) {
-		spin_unlock(&dentry->d_lock);
-		goto out;
-	}
-	spin_unlock(&dentry->d_lock);
 	spin_lock(&dmabuf->name_lock);
 	if (dmabuf->name)
 		ret = strlcpy(name, dmabuf->name, DMA_BUF_NAME_LEN);
 	spin_unlock(&dmabuf->name_lock);
-	dmabuf_dent_put(dmabuf);
-out:
+
 	return dynamic_dname(dentry, buffer, buflen, "/%s:%s",
 			     dentry->d_name.name, ret > 0 ? name : "");
 }
 
-static const struct dentry_operations dma_buf_dentry_ops = {
-	.d_dname = dmabuffs_dname,
-};
-
-static struct vfsmount *dma_buf_mnt;
-
-static struct dentry *dma_buf_fs_mount(struct file_system_type *fs_type,
-		int flags, const char *name, void *data)
-{
-	return mount_pseudo(fs_type, "dmabuf:", NULL, &dma_buf_dentry_ops,
-			DMA_BUF_MAGIC);
-}
-
-static struct file_system_type dma_buf_fs_type = {
-	.name = "dmabuf",
-	.mount = dma_buf_fs_mount,
-	.kill_sb = kill_anon_super,
-};
-
-static int dma_buf_release(struct inode *inode, struct file *file)
+static void dma_buf_release(struct dentry *dentry)
 {
 	struct dma_buf *dmabuf;
-	struct dentry *dentry = file->f_path.dentry;
 
-	if (!is_dma_buf_file(file))
-		return -EINVAL;
+	dmabuf = dentry->d_fsdata;
 
-	dmabuf = file->private_data;
-
-	spin_lock(&dentry->d_lock);
-	dentry->d_fsdata = NULL;
-	spin_unlock(&dentry->d_lock);
 	BUG_ON(dmabuf->vmapping_counter);
 
 	/*
@@ -158,9 +115,29 @@ static int dma_buf_release(struct inode *inode, struct file *file)
 		reservation_object_fini(dmabuf->resv);
 
 	module_put(dmabuf->owner);
-	dmabuf_dent_put(dmabuf);
-	return 0;
+	kfree(dmabuf->buf_name);
+	kfree(dmabuf);
 }
+
+static const struct dentry_operations dma_buf_dentry_ops = {
+	.d_dname = dmabuffs_dname,
+	.d_release = dma_buf_release,
+};
+
+static struct vfsmount *dma_buf_mnt;
+
+static struct dentry *dma_buf_fs_mount(struct file_system_type *fs_type,
+		int flags, const char *name, void *data)
+{
+	return mount_pseudo(fs_type, "dmabuf:", NULL, &dma_buf_dentry_ops,
+			DMA_BUF_MAGIC);
+}
+
+static struct file_system_type dma_buf_fs_type = {
+	.name = "dmabuf",
+	.mount = dma_buf_fs_mount,
+	.kill_sb = kill_anon_super,
+};
 
 static int dma_buf_mmap_internal(struct file *file, struct vm_area_struct *vma)
 {
@@ -449,7 +426,8 @@ static long dma_buf_ioctl(struct file *file,
 
 		return ret;
 
-	case DMA_BUF_SET_NAME:
+	case DMA_BUF_SET_NAME_A:
+	case DMA_BUF_SET_NAME_B:
 		return dma_buf_set_name(dmabuf, (const char __user *)arg);
 
 	default:
@@ -472,7 +450,6 @@ static void dma_buf_show_fdinfo(struct seq_file *m, struct file *file)
 }
 
 static const struct file_operations dma_buf_fops = {
-	.release	= dma_buf_release,
 	.mmap		= dma_buf_mmap_internal,
 	.llseek		= dma_buf_llseek,
 	.poll		= dma_buf_poll,
@@ -632,7 +609,6 @@ struct dma_buf *dma_buf_export(const struct dma_buf_export_info *exp_info)
 	dmabuf->buf_name = bufname;
 	dmabuf->name = bufname;
 	dmabuf->ktime = ktime_get();
-	atomic_set(&dmabuf->dent_count, 1);
 
 	if (!resv) {
 		resv = (struct reservation_object *)&dmabuf[1];
@@ -1232,9 +1208,6 @@ EXPORT_SYMBOL_GPL(dma_buf_kunmap);
 int dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 		 unsigned long pgoff)
 {
-	struct file *oldfile;
-	int ret;
-
 	if (WARN_ON(!dmabuf || !vma))
 		return -EINVAL;
 
@@ -1248,22 +1221,11 @@ int dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 		return -EINVAL;
 
 	/* readjust the vma */
-	get_file(dmabuf->file);
-	oldfile = vma->vm_file;
-	vma->vm_file = dmabuf->file;
+	fput(vma->vm_file);
+	vma->vm_file = get_file(dmabuf->file);
 	vma->vm_pgoff = pgoff;
 
-	ret = dmabuf->ops->mmap(dmabuf, vma);
-	if (ret) {
-		/* restore old parameters on failure */
-		vma->vm_file = oldfile;
-		fput(dmabuf->file);
-	} else {
-		if (oldfile)
-			fput(oldfile);
-	}
-	return ret;
-
+	return dmabuf->ops->mmap(dmabuf, vma);
 }
 EXPORT_SYMBOL_GPL(dma_buf_mmap);
 

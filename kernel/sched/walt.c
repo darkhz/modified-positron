@@ -928,6 +928,9 @@ void set_window_start(struct rq *rq)
 unsigned int max_possible_efficiency = 1;
 unsigned int min_possible_efficiency = UINT_MAX;
 
+unsigned int sysctl_sched_conservative_pl;
+unsigned int sysctl_sched_many_wakeup_threshold = 1000;
+
 #define INC_STEP 8
 #define DEC_STEP 2
 #define CONSISTENT_THRES 16
@@ -3371,7 +3374,6 @@ void walt_sched_init_rq(struct rq *rq)
 	rq->window_start = 0;
 	rq->cum_window_start = 0;
 	rq->walt_stats.nr_big_tasks = 0;
-	rq->walt_flags = 0;
 	rq->cur_irqload = 0;
 	rq->avg_irqload = 0;
 	rq->irqload_ts = 0;

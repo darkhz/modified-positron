@@ -3061,14 +3061,20 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		if (ep_info.max_ep_pairs != QUERY_MAX_EP_PAIRS)
+		if (ep_info.max_ep_pairs != QUERY_MAX_EP_PAIRS) {
 			IPAERR_RL("unexpected max_ep_pairs %d\n",
 			ep_info.max_ep_pairs);
+			retval = -EFAULT;
+			break;
+		}
 
-		if (ep_info.ep_pair_size !=
-			(QUERY_MAX_EP_PAIRS * sizeof(struct ipa_ep_pair_info)))
+		if (ep_info.ep_pair_size != (QUERY_MAX_EP_PAIRS *
+			sizeof(struct ipa_ep_pair_info))) {
 			IPAERR_RL("unexpected ep_pair_size %d\n",
 			ep_info.max_ep_pairs);
+			retval = -EFAULT;
+			break;
+		}
 
 		uptr = ep_info.info;
 		if (unlikely(!uptr)) {
@@ -5584,6 +5590,7 @@ void ipa3_dec_client_disable_clks_no_block(
 		&ipa_dec_clients_disable_clks_on_wq_work, 0);
 }
 
+#ifdef IPA_WAKELOCKS
 /**
  * ipa3_inc_acquire_wakelock() - Increase active clients counter, and
  * acquire wakelock if necessary
@@ -5624,6 +5631,7 @@ void ipa3_dec_release_wakelock(void)
 		__pm_relax(&ipa3_ctx->w_lock);
 	spin_unlock_irqrestore(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
 }
+#endif
 
 int ipa3_set_clock_plan_from_pm(int idx)
 {
@@ -5821,11 +5829,13 @@ void ipa3_suspend_handler(enum ipa_irq_type interrupt,
 					atomic_set(
 					&ipa3_ctx->transport_pm.dec_clients,
 					1);
+				#ifdef IPA_WAKELOCKS
 					/*
 					 * acquire wake lock as long as suspend
 					 * vote is held
 					 */
 					ipa3_inc_acquire_wakelock();
+				#endif
 					ipa3_process_irq_schedule_rel();
 				}
 				mutex_unlock(pm_mutex_ptr);
@@ -5902,7 +5912,9 @@ static void ipa3_transport_release_resource(struct work_struct *work)
 			ipa3_process_irq_schedule_rel();
 		} else {
 			atomic_set(&ipa3_ctx->transport_pm.dec_clients, 0);
+		#ifdef IPA_WAKELOCKS
 			ipa3_dec_release_wakelock();
+		#endif
 			IPA_ACTIVE_CLIENTS_DEC_SPECIAL("TRANSPORT_RESOURCE");
 		}
 	}
@@ -6674,7 +6686,7 @@ static ssize_t ipa3_write(struct file *file, const char __user *buf,
 
 	int i = 0;
 
-	if (sizeof(dbg_buff) < count + 1)
+	if (count >= sizeof(dbg_buff))
 		return -EFAULT;
 
 	missing = copy_from_user(dbg_buff, buf, min(sizeof(dbg_buff), count));
@@ -7256,6 +7268,13 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 		result = -ENOMEM;
 		goto fail_hdr_offset_cache;
 	}
+	ipa3_ctx->fnr_stats_cache = kmem_cache_create("IPA_FNR_STATS",
+		sizeof(struct ipa_ioc_flt_rt_counter_alloc), 0, 0, NULL);
+	if (!ipa3_ctx->fnr_stats_cache) {
+		IPAERR(":ipa fnr stats cache create failed\n");
+		result = -ENOMEM;
+		goto fail_fnr_stats_cache;
+	}
 	ipa3_ctx->hdr_proc_ctx_cache = kmem_cache_create("IPA_HDR_PROC_CTX",
 		sizeof(struct ipa3_hdr_proc_ctx_entry), 0, 0, NULL);
 	if (!ipa3_ctx->hdr_proc_ctx_cache) {
@@ -7368,11 +7387,11 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	}
 
 	ipa3_debugfs_pre_init();
-
+#ifdef IPA_WAKELOCKS
 	/* Create a wakeup source. */
 	wakeup_source_init(&ipa3_ctx->w_lock, "IPA_WS");
 	spin_lock_init(&ipa3_ctx->wakelock_ref_cnt.spinlock);
-
+#endif
 	/* Initialize Power Management framework */
 	if (ipa3_ctx->use_ipa_pm) {
 		result = ipa_pm_init(&ipa3_res.pm_init);
@@ -7513,6 +7532,8 @@ fail_rt_tbl_cache:
 fail_hdr_proc_ctx_offset_cache:
 	kmem_cache_destroy(ipa3_ctx->hdr_proc_ctx_cache);
 fail_hdr_proc_ctx_cache:
+	kmem_cache_destroy(ipa3_ctx->fnr_stats_cache);
+fail_fnr_stats_cache:
 	kmem_cache_destroy(ipa3_ctx->hdr_offset_cache);
 fail_hdr_offset_cache:
 	kmem_cache_destroy(ipa3_ctx->hdr_cache);

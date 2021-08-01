@@ -366,7 +366,7 @@ static int irq_setup(struct gf_dev *gf_dev)
 
 	gf_dev->irq = gf_irq_num(gf_dev);
 	status = request_threaded_irq(gf_dev->irq, NULL, gf_irq,
-			IRQF_TRIGGER_RISING | IRQF_ONESHOT | IRQF_PERF_CRITICAL,
+			IRQF_TRIGGER_RISING | IRQF_ONESHOT | IRQF_PERF_AFFINE,
 			"gf", gf_dev);
 
 	if (status) {
@@ -409,11 +409,6 @@ static void gf_kernel_key_input(struct gf_dev *gf_dev, struct gf_key *gf_key)
 		input_report_key(gf_dev->input, key_input, 1);
 		input_sync(gf_dev->input);
 		input_report_key(gf_dev->input, key_input, 0);
-		input_sync(gf_dev->input);
-	}
-
-	if (gf_key->key == GF_KEY_HOME) {
-		input_report_key(gf_dev->input, key_input, gf_key->value);
 		input_sync(gf_dev->input);
 	}
 }

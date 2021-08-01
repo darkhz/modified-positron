@@ -110,8 +110,6 @@ struct wmi_ext_dbg_msg {
 };
 #endif /*WMI_EXT_DBG */
 
-#ifdef WMI_INTERFACE_EVENT_LOGGING
-
 #ifndef WMI_EVENT_DEBUG_MAX_ENTRY
 #define WMI_EVENT_DEBUG_MAX_ENTRY (1024)
 #endif
@@ -161,6 +159,8 @@ struct wmi_ext_dbg_msg {
 #define wmi_warn_rl(params...) QDF_TRACE_WARN_RL(QDF_MODULE_ID_WMI, params)
 #define wmi_info_rl(params...) QDF_TRACE_INFO_RL(QDF_MODULE_ID_WMI, params)
 #define wmi_debug_rl(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_WMI, params)
+
+#ifdef WMI_INTERFACE_EVENT_LOGGING
 
 /**
  * struct wmi_command_debug - WMI command log buffer data type
@@ -2009,6 +2009,9 @@ QDF_STATUS
 			   void *evt_buf,
 			   struct wmi_neighbor_report_data *dst,
 			   uint8_t idx, uint8_t rpt_idx);
+QDF_STATUS
+(*extract_roam_msg_info)(wmi_unified_t wmi_handle, void *evt_buf,
+			struct wmi_roam_msg_info *dst, uint8_t idx);
 
 void (*wmi_pdev_id_conversion_enable)(wmi_unified_t wmi_handle,
 				      uint32_t *pdev_map,

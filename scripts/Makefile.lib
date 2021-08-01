@@ -250,7 +250,7 @@ $(obj)/%: $(src)/%_shipped
 # ---------------------------------------------------------------------------
 
 quiet_cmd_ld = LD      $@
-cmd_ld = $(LD) $(LDFLAGS) $(ldflags-y) $(LDFLAGS_$(@F)) \
+cmd_ld = $(LDFINAL) $(LDFLAGS) $(ldflags-y) $(LDFLAGS_$(@F)) \
 	       $(filter-out FORCE,$^) -o $@
 
 # Objcopy
@@ -338,6 +338,11 @@ $(obj)/%.dtb: $(src)/%.dts FORCE
 	$(call if_changed_dep,dtc)
 
 dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
+
+# mkdtimg
+#----------------------------------------------------------------------------
+quiet_cmd_mkdtimg = DTBOIMG $@
+cmd_mkdtimg = python2 $(srctree)/scripts/dtc/mkdtboimg.py create $@ --page_size=4096 $(filter-out FORCE,$^)
 
 # cat
 # ---------------------------------------------------------------------------

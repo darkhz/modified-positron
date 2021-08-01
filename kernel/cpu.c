@@ -776,6 +776,10 @@ void __init cpuhp_threads_init(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+#ifndef arch_clear_mm_cpumask_cpu
+#define arch_clear_mm_cpumask_cpu(cpu, mm) cpumask_clear_cpu(cpu, mm_cpumask(mm))
+#endif
+
 /**
  * clear_tasks_mm_cpumask - Safely clear tasks' mm_cpumask for a CPU
  * @cpu: a CPU id
@@ -811,7 +815,7 @@ void clear_tasks_mm_cpumask(int cpu)
 		t = find_lock_task_mm(p);
 		if (!t)
 			continue;
-		cpumask_clear_cpu(cpu, mm_cpumask(t->mm));
+		arch_clear_mm_cpumask_cpu(cpu, t->mm);
 		task_unlock(t);
 	}
 	rcu_read_unlock();
@@ -1034,6 +1038,16 @@ static int do_cpu_down(unsigned int cpu, enum cpuhp_state target)
 	struct cpumask newmask;
 	int err;
 
+	preempt_disable();
+	cpumask_andnot(&newmask, cpu_online_mask, cpumask_of(cpu));
+	preempt_enable();
+
+	/* One big, LITTLE, and prime CPU must remain online */
+	if (!cpumask_intersects(&newmask, cpu_lp_mask) ||
+	    !cpumask_intersects(&newmask, cpu_perf_mask) ||
+	    !cpumask_intersects(&newmask, cpu_prime_mask))
+		return -EINVAL;
+
 	/*
 	 * When cpusets are enabled, the rebuilding of the scheduling
 	 * domains is deferred to a workqueue context. Make sure
@@ -1045,12 +1059,6 @@ static int do_cpu_down(unsigned int cpu, enum cpuhp_state target)
 	 * happens on from other CPUs in the root domain.
 	 */
 	cpuset_wait_for_hotplug();
-
-	cpumask_andnot(&newmask, cpu_online_mask, cpumask_of(cpu));
-	/* One big cluster CPU and one little cluster CPU must remain online */
-	if (!cpumask_intersects(&newmask, cpu_perf_mask) ||
-		!cpumask_intersects(&newmask, cpu_lp_mask))
-		return -EINVAL;
 
 	cpu_maps_update_begin();
 	err = cpu_down_maps_locked(cpu, target);
@@ -1360,7 +1368,7 @@ void enable_nonboot_cpus(void)
 	arch_enable_nonboot_cpus_end();
 
 	cpumask_clear(frozen_cpus);
-	reaffine_perf_irqs();
+	reaffine_perf_irqs(false);
 out:
 	cpu_maps_update_done();
 }
@@ -2377,6 +2385,14 @@ const struct cpumask *const cpu_perf_mask = to_cpumask(&perf_cpu_bits);
 const struct cpumask *const cpu_perf_mask = cpu_possible_mask;
 #endif
 EXPORT_SYMBOL(cpu_perf_mask);
+
+#if CONFIG_PRIME_CPU_MASK
+static const unsigned long prime_cpu_bits = CONFIG_PRIME_CPU_MASK;
+const struct cpumask *const cpu_prime_mask = to_cpumask(&prime_cpu_bits);
+#else
+const struct cpumask *const cpu_prime_mask = cpu_possible_mask;
+#endif
+EXPORT_SYMBOL(cpu_prime_mask);
 
 void init_cpu_present(const struct cpumask *src)
 {

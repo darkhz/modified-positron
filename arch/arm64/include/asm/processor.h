@@ -125,6 +125,16 @@ struct thread_struct {
 	struct debug_info	debug;		/* debugging */
 };
 
+/*
+ * Everything usercopied to/from thread_struct is statically-sized, so
+ * no hardened usercopy whitelist is needed.
+ */
+static inline void arch_thread_struct_whitelist(unsigned long *offset,
+						unsigned long *size)
+{
+	*offset = *size = 0;
+}
+
 #ifdef CONFIG_COMPAT
 #define task_user_tls(t)						\
 ({									\
@@ -222,21 +232,19 @@ extern struct task_struct *cpu_switch_to(struct task_struct *prev,
 #define ARCH_HAS_PREFETCH
 static inline void prefetch(const void *ptr)
 {
-	asm volatile("prfm pldl1keep, [%x0]\n" : : "r" (ptr));
+	asm volatile("prfm pldl1keep, %a0\n" : : "p" (ptr));
 }
 
 #define ARCH_HAS_PREFETCHW
 static inline void prefetchw(const void *ptr)
 {
-	asm volatile("prfm pstl1keep, [%x0]\n" : : "r" (ptr));
+	asm volatile("prfm pstl1keep, %a0\n" : : "p" (ptr));
 }
 
 #define ARCH_HAS_SPINLOCK_PREFETCH
 static inline void spin_lock_prefetch(const void *ptr)
 {
-	asm volatile(ARM64_LSE_ATOMIC_INSN(
-		     "prfm pstl1strm, [%x0]",
-		     "nop") : : "p" (ptr));
+	asm volatile("prfm pstl1strm, %a0\n" : : "p" (ptr));
 }
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT

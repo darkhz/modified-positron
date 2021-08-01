@@ -5,9 +5,11 @@
 # A mix between the arm64 and arm vDSO Makefiles.
 
 ifeq ($(cc-name),clang)
-  CC_ARM32 := $(CC) $(CLANG_TARGET_ARM32) -no-integrated-as $(CLANG_GCC32_TC) $(CLANG_PREFIX32)
+  CC_ARM32 := $(CC) $(CLANG_TARGET_ARM32) $(CLANG_GCC32_TC) $(CLANG_PREFIX32)
+  LD_ARM32 ?= $(LD)
 else
   CC_ARM32 := $(CROSS_COMPILE_ARM32)$(cc-name)
+  LD_ARM32 ?= $(CROSS_COMPILE_ARM32)ld
 endif
 
 # Same as cc-*option, but using CC_ARM32 instead of CC
@@ -15,8 +17,6 @@ cc32-option = $(call try-run,\
         $(CC_ARM32) $(1) -c -x c /dev/null -o "$$TMP",$(1),$(2))
 cc32-disable-warning = $(call try-run,\
 	$(CC_ARM32) -W$(strip $(1)) -c -x c /dev/null -o "$$TMP",-Wno-$(strip $(1)))
-cc32-ldoption = $(call try-run,\
-        $(CC_ARM32) $(1) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
 
 # We cannot use the global flags to compile the vDSO files, the main reason
 # being that the 32-bit compiler may be older than the main (64-bit) compiler
@@ -55,11 +55,8 @@ endif
 VDSO_CAFLAGS += -fPIC -fno-builtin -fno-stack-protector
 VDSO_CAFLAGS += -DDISABLE_BRANCH_PROFILING
 
-# Try to compile for ARMv8. If the compiler is too old and doesn't support it,
-# fall back to v7. There is no easy way to check for what architecture the code
-# is being compiled, so define a macro specifying that (see arch/arm/Makefile).
-VDSO_CAFLAGS += $(call cc32-option,-march=armv8-a -D__LINUX_ARM_ARCH__=8,\
-                                   -march=armv7-a -D__LINUX_ARM_ARCH__=7)
+# Always compile for ARMv8 as compilers supported by AOSP support this.
+VDSO_CAFLAGS += -D__LINUX_ARM_ARCH__=8
 
 VDSO_CFLAGS := $(VDSO_CAFLAGS)
 # KBUILD_CFLAGS from top-level Makefile
@@ -90,15 +87,13 @@ VDSO_CFLAGS += -Wno-int-to-pointer-cast
 VDSO_AFLAGS := $(VDSO_CAFLAGS)
 VDSO_AFLAGS += -D__ASSEMBLY__
 
-VDSO_LDFLAGS := $(VDSO_CPPFLAGS)
-# From arm vDSO Makefile
-VDSO_LDFLAGS += -Wl,-Bsymbolic -Wl,--no-undefined -Wl,-soname=linux-vdso.so.1
-VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
-VDSO_LDFLAGS += -nostdlib -shared -mfloat-abi=soft
-VDSO_LDFLAGS += $(call cc32-ldoption,-Wl$(comma)--hash-style=sysv)
-VDSO_LDFLAGS += $(call cc32-ldoption,-Wl$(comma)--build-id)
-VDSO_LDFLAGS += $(call cc32-ldoption,-fuse-ld=bfd)
+VDSO_CFLAGS  += -mtune=cortex-a55 -mcpu=cortex-a55
+VDSO_AFLAGS  += -Wa,-mcpu=cortex-a55
 
+# From arm vDSO Makefile
+VDSO_LDFLAGS += -Bsymbolic --no-undefined -soname=linux-vdso.so.1
+VDSO_LDFLAGS += -z max-page-size=4096 -z common-page-size=4096
+VDSO_LDFLAGS += -nostdlib -shared --hash-style=sysv --build-id=sha1
 
 # Borrow vdsomunge.c from the arm vDSO
 # We have to use a relative path because scripts/Makefile.host prefixes
@@ -145,8 +140,8 @@ $(asm-obj-vdso): %.o: %.S FORCE
 
 # Actual build commands
 quiet_cmd_vdsold = VDSOL32   $@
-      cmd_vdsold = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_LDFLAGS) \
-                   -Wl,-T $(filter %.lds,$^) $(filter %.o,$^) -o $@
+      cmd_vdsold = $(LD_ARM32) $(VDSO_LDFLAGS) \
+                   -T $(filter %.lds,$^) $(filter %.o,$^) -o $@
 quiet_cmd_vdsocc = VDSOC32   $@
       cmd_vdsocc = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_CFLAGS) -c -o $@ $<
 quiet_cmd_vdsoas = VDSOA32   $@
