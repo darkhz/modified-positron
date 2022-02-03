@@ -5,7 +5,7 @@
 # A mix between the arm64 and arm vDSO Makefiles.
 
 ifeq ($(cc-name),clang)
-  CC_ARM32 := $(CC) $(CLANG_TARGET_ARM32) $(CLANG_GCC32_TC) $(CLANG_PREFIX32)
+  CC_ARM32 := $(CC) $(CLANG_TARGET_ARM32)
   LD_ARM32 ?= $(LD)
 else
   CC_ARM32 := $(CROSS_COMPILE_ARM32)$(cc-name)
@@ -87,7 +87,7 @@ VDSO_CFLAGS += -Wno-int-to-pointer-cast
 VDSO_AFLAGS := $(VDSO_CAFLAGS)
 VDSO_AFLAGS += -D__ASSEMBLY__
 
-VDSO_CFLAGS  += -mtune=cortex-a55 -mcpu=cortex-a55
+VDSO_CFLAGS  += -mcpu=cortex-a55
 VDSO_AFLAGS  += -Wa,-mcpu=cortex-a55
 
 # From arm vDSO Makefile

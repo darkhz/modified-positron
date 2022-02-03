@@ -76,7 +76,7 @@
 
 /*
  * Object location (<PFN>, <obj_idx>) is encoded as
- * a single (unsigned long) handle value.
+ * as single (unsigned long) handle value.
  *
  * Note that object index <obj_idx> starts from 0.
  *
@@ -293,7 +293,11 @@ struct zspage {
 };
 
 struct mapping_area {
+#ifdef CONFIG_PGTABLE_MAPPING
+	struct vm_struct *vm; /* vm area for mapping object that span pages */
+#else
 	char *vm_buf; /* copy buffer for objects that span pages */
+#endif
 	char *vm_addr; /* address of kmap_atomic()'ed pages */
 	enum zs_mapmode vm_mm; /* mapping mode */
 };
@@ -439,27 +443,9 @@ static void zs_zpool_unmap(void *pool, unsigned long handle)
 	zs_unmap_object(pool, handle);
 }
 
-static unsigned long zs_zpool_compact(void *pool)
-{
-	return zs_compact(pool);
-}
-
-static unsigned long zs_zpool_get_compacted(void *pool)
-{
-	struct zs_pool_stats stats;
-
-	zs_pool_stats(pool, &stats);
-	return atomic_long_read(&stats.pages_compacted);
-}
-
 static u64 zs_zpool_total_size(void *pool)
 {
 	return zs_get_total_pages(pool) << PAGE_SHIFT;
-}
-
-static size_t zs_zpool_huge_class_size(void *pool)
-{
-	return zs_huge_class_size(pool);
 }
 
 static struct zpool_driver zs_zpool_driver = {
@@ -472,10 +458,7 @@ static struct zpool_driver zs_zpool_driver = {
 	.shrink =	zs_zpool_shrink,
 	.map =		zs_zpool_map,
 	.unmap =	zs_zpool_unmap,
-	.compact =	zs_zpool_compact,
-	.get_num_compacted = zs_zpool_get_compacted,
 	.total_size =	zs_zpool_total_size,
-	.huge_class_size = zs_zpool_huge_class_size,
 };
 
 MODULE_ALIAS("zpool-zsmalloc");
@@ -783,10 +766,13 @@ static void insert_zspage(struct size_class *class,
 	 * We want to see more ZS_FULL pages and less almost empty/full.
 	 * Put pages with higher ->inuse first.
 	 */
-	if (head && get_zspage_inuse(zspage) < get_zspage_inuse(head))
-		list_add(&zspage->list, &head->list);
-	else
-		list_add(&zspage->list, &class->fullness_list[fullness]);
+	if (head) {
+		if (get_zspage_inuse(zspage) < get_zspage_inuse(head)) {
+			list_add(&zspage->list, &head->list);
+			return;
+		}
+	}
+	list_add(&zspage->list, &class->fullness_list[fullness]);
 }
 
 /*
@@ -1130,7 +1116,7 @@ static struct zspage *alloc_zspage(struct zs_pool *pool,
 	struct page *pages[ZS_MAX_PAGES_PER_ZSPAGE];
 	struct zspage *zspage = cache_alloc_zspage(pool, gfp);
 
-	if (unlikely(!zspage))
+	if (!zspage)
 		return NULL;
 
 	memset(zspage, 0, sizeof(struct zspage));
@@ -1174,6 +1160,46 @@ static struct zspage *find_get_zspage(struct size_class *class)
 
 	return zspage;
 }
+
+#ifdef CONFIG_PGTABLE_MAPPING
+static inline int __zs_cpu_up(struct mapping_area *area)
+{
+	/*
+	 * Make sure we don't leak memory if a cpu UP notification
+	 * and zs_init() race and both call zs_cpu_up() on the same cpu
+	 */
+	if (area->vm)
+		return 0;
+	area->vm = alloc_vm_area(PAGE_SIZE * 2, NULL);
+	if (!area->vm)
+		return -ENOMEM;
+	return 0;
+}
+
+static inline void __zs_cpu_down(struct mapping_area *area)
+{
+	if (area->vm)
+		free_vm_area(area->vm);
+	area->vm = NULL;
+}
+
+static inline void *__zs_map_object(struct mapping_area *area,
+				struct page *pages[2], int off, int size)
+{
+	BUG_ON(map_vm_area(area->vm, PAGE_KERNEL, pages));
+	area->vm_addr = area->vm->addr;
+	return area->vm_addr + off;
+}
+
+static inline void __zs_unmap_object(struct mapping_area *area,
+				struct page *pages[2], int off, int size)
+{
+	unsigned long addr = (unsigned long)area->vm_addr;
+
+	unmap_kernel_range(addr, PAGE_SIZE * 2);
+}
+
+#else /* CONFIG_PGTABLE_MAPPING */
 
 static inline int __zs_cpu_up(struct mapping_area *area)
 {
@@ -1254,6 +1280,8 @@ out:
 	/* enable page faults to match kunmap_atomic() return conditions */
 	pagefault_enable();
 }
+
+#endif /* CONFIG_PGTABLE_MAPPING */
 
 static int zs_cpu_prepare(unsigned int cpu)
 {
@@ -1486,7 +1514,7 @@ unsigned long zs_malloc(struct zs_pool *pool, size_t size, gfp_t gfp)
 		return 0;
 
 	handle = cache_alloc_handle(pool, gfp);
-	if (unlikely(!handle))
+	if (!handle)
 		return 0;
 
 	/* extra space in chunk to keep the handle */
@@ -1508,7 +1536,7 @@ unsigned long zs_malloc(struct zs_pool *pool, size_t size, gfp_t gfp)
 	spin_unlock(&class->lock);
 
 	zspage = alloc_zspage(pool, class, gfp);
-	if (unlikely(!zspage)) {
+	if (!zspage) {
 		cache_free_handle(pool, handle);
 		return 0;
 	}
@@ -2273,13 +2301,11 @@ static unsigned long zs_can_compact(struct size_class *class)
 	return obj_wasted * class->pages_per_zspage;
 }
 
-static unsigned long __zs_compact(struct zs_pool *pool,
-				  struct size_class *class)
+static void __zs_compact(struct zs_pool *pool, struct size_class *class)
 {
 	struct zs_compact_control cc;
 	struct zspage *src_zspage;
 	struct zspage *dst_zspage = NULL;
-	unsigned long pages_freed = 0;
 
 	spin_lock(&class->lock);
 	while ((src_zspage = isolate_zspage(class, true))) {
@@ -2309,7 +2335,7 @@ static unsigned long __zs_compact(struct zs_pool *pool,
 		putback_zspage(class, dst_zspage);
 		if (putback_zspage(class, src_zspage) == ZS_EMPTY) {
 			free_zspage(pool, class, src_zspage);
-			pages_freed += class->pages_per_zspage;
+			pool->stats.pages_compacted += class->pages_per_zspage;
 		}
 		spin_unlock(&class->lock);
 		cond_resched();
@@ -2320,15 +2346,12 @@ static unsigned long __zs_compact(struct zs_pool *pool,
 		putback_zspage(class, src_zspage);
 
 	spin_unlock(&class->lock);
-
-	return pages_freed;
 }
 
 unsigned long zs_compact(struct zs_pool *pool)
 {
 	int i;
 	struct size_class *class;
-	unsigned long pages_freed = 0;
 
 	for (i = ZS_SIZE_CLASSES - 1; i >= 0; i--) {
 		class = pool->size_class[i];
@@ -2336,11 +2359,10 @@ unsigned long zs_compact(struct zs_pool *pool)
 			continue;
 		if (class->index != i)
 			continue;
-		pages_freed += __zs_compact(pool, class);
+		__zs_compact(pool, class);
 	}
-	atomic_long_add(pages_freed, &pool->stats.pages_compacted);
 
-	return pages_freed;
+	return pool->stats.pages_compacted;
 }
 EXPORT_SYMBOL_GPL(zs_compact);
 
@@ -2357,12 +2379,13 @@ static unsigned long zs_shrinker_scan(struct shrinker *shrinker,
 	struct zs_pool *pool = container_of(shrinker, struct zs_pool,
 			shrinker);
 
+	pages_freed = pool->stats.pages_compacted;
 	/*
 	 * Compact classes and calculate compaction delta.
 	 * Can run concurrently with a manually triggered
 	 * (by user) compaction.
 	 */
-	pages_freed = zs_compact(pool);
+	pages_freed = zs_compact(pool) - pages_freed;
 
 	return pages_freed ? pages_freed : SHRINK_STOP;
 }

@@ -3162,6 +3162,7 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_MON_FILTER] = {"Monitor Filter"},
 	[QDF_MODULE_ID_ANY] = {"ANY"},
 	[QDF_MODULE_ID_PKT_CAPTURE] = {"pkt_capture"},
+	[QDF_MODULE_ID_GPIO] = {"GPIO_CFG"},
 };
 qdf_export_symbol(g_qdf_category_name);
 
@@ -3209,7 +3210,6 @@ static inline void print_to_console(char *str_buffer)
 #define print_to_console(str)
 #endif
 
-#if 0
 #ifdef MULTI_IF_NAME
 static const char *qdf_trace_wlan_modname(void)
 {
@@ -3294,7 +3294,6 @@ void qdf_trace_msg_cmn(unsigned int idx,
 	}
 }
 qdf_export_symbol(qdf_trace_msg_cmn);
-#endif
 
 QDF_STATUS qdf_print_setup(void)
 {
@@ -3625,6 +3624,7 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_MON_FILTER] = QDF_TRACE_LEVEL_INFO,
 		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_INFO,
 		[QDF_MODULE_ID_PKT_CAPTURE] = QDF_TRACE_LEVEL_NONE,
+		[QDF_MODULE_ID_GPIO] = QDF_TRACE_LEVEL_NONE,
 	};
 
 	for (i = 0; i < MAX_SUPPORTED_CATEGORY; i++) {
@@ -3742,7 +3742,6 @@ void qdf_log_dump_at_kernel_level(bool enable)
 
 qdf_export_symbol(qdf_log_dump_at_kernel_level);
 
-#if 0
 bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 {
 	QDF_TRACE_LEVEL verbose_mask;
@@ -3774,7 +3773,6 @@ bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 		return true;
 }
 qdf_export_symbol(qdf_print_is_category_enabled);
-#endif
 
 bool qdf_print_is_verbose_enabled(unsigned int idx, QDF_MODULE_ID category,
 				  QDF_TRACE_LEVEL verbose)

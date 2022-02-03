@@ -14,9 +14,9 @@ LINUXINCLUDE    += \
 
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/4.0/config/atollautoconf.h
+endif
 
 obj-y += soc/
 obj-y += dsp/
 obj-y += ipc/
 obj-y += asoc/
-endif

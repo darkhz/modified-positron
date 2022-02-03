@@ -11,6 +11,7 @@
  *
  */
 
+#define trace_gpu_frequency(...) {}
 #define trace_kgsl_active_count(...) {}
 #define trace_kgsl_bus(...) {}
 #define trace_kgsl_buslevel(...) {}

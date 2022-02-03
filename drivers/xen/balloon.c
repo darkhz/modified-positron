@@ -633,13 +633,11 @@ static int add_ballooned_pages(int nr_pages)
 	if (xen_hotplug_unpopulated) {
 		st = reserve_additional_memory();
 		if (st != BP_ECANCELED) {
-			int rc;
-
 			mutex_unlock(&balloon_mutex);
-			rc = wait_event_interruptible(balloon_wq,
+			wait_event(balloon_wq,
 				   !list_empty(&ballooned_pages));
 			mutex_lock(&balloon_mutex);
-			return rc ? -ENOMEM : 0;
+			return 0;
 		}
 	}
 
@@ -697,12 +695,6 @@ int alloc_xenballooned_pages(int nr_pages, struct page **pages)
  out_undo:
 	mutex_unlock(&balloon_mutex);
 	free_xenballooned_pages(pgno, pages);
-	/*
-	 * NB: free_xenballooned_pages will only subtract pgno pages, but since
-	 * target_unpopulated is incremented with nr_pages at the start we need
-	 * to remove the remaining ones also, or accounting will be screwed.
-	 */
-	balloon_stats.target_unpopulated -= nr_pages - pgno;
 	return ret;
 }
 EXPORT_SYMBOL(alloc_xenballooned_pages);
@@ -749,7 +741,7 @@ static void __init balloon_add_region(unsigned long start_pfn,
 
 	for (pfn = start_pfn; pfn < extra_pfn_end; pfn++) {
 		page = pfn_to_page(pfn);
-		/* totalram_pages() and totalhigh_pages do not
+		/* totalram_pages and totalhigh_pages do not
 		   include the boot-time balloon extension, so
 		   don't subtract from it. */
 		__balloon_append(page);

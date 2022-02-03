@@ -11,7 +11,6 @@
 #include <linux/types.h>
 #include <linux/bug.h>
 #include <linux/restart_block.h>
-#include <linux/errno.h>
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 /*
@@ -40,18 +39,6 @@ enum {
 
 #ifdef __KERNEL__
 
-#ifndef arch_set_restart_data
-#define arch_set_restart_data(restart) do { } while (0)
-#endif
-
-static inline long set_restart_fn(struct restart_block *restart,
-					long (*fn)(struct restart_block *))
-{
-	restart->fn = fn;
-	arch_set_restart_data(restart);
-	return -ERESTART_RESTARTBLOCK;
-}
-
 #ifndef THREAD_ALIGN
 #define THREAD_ALIGN	THREAD_SIZE
 #endif
@@ -65,11 +52,15 @@ static inline long set_restart_fn(struct restart_block *restart,
 
 static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
 {
+	/* set_bit() with release semantics */
+	smp_mb__before_atomic();
 	set_bit(flag, (unsigned long *)&ti->flags);
 }
 
 static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
 {
+	/* clear_bit() with release semantics */
+	smp_mb__before_atomic();
 	clear_bit(flag, (unsigned long *)&ti->flags);
 }
 
@@ -84,17 +75,35 @@ static inline void update_ti_thread_flag(struct thread_info *ti, int flag,
 
 static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
 {
-	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
+	atomic_long_t *p = (atomic_long_t *)&ti->flags;
+	const unsigned long mask = BIT_MASK(flag);
+	long old;
+
+	/* test_and_set_bit() sans the unordered test */
+	p += BIT_WORD(flag);
+	old = atomic_long_fetch_or(mask, p);
+	return !!(old & mask);
 }
 
 static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
 {
-	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
+	atomic_long_t *p = (atomic_long_t *)&ti->flags;
+	const unsigned long mask = BIT_MASK(flag);
+	long old;
+
+	/* test_and_clear_bit() sans the unordered test */
+	p += BIT_WORD(flag);
+	old = atomic_long_fetch_andnot(mask, p);
+	return !!(old & mask);
 }
 
 static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
 {
-	return test_bit(flag, (unsigned long *)&ti->flags);
+	const atomic_long_t *p = (atomic_long_t *)&ti->flags;
+
+	/* test_bit() with acquire semantics */
+	p += BIT_WORD(flag);
+	return !!(atomic_long_read_acquire(p) & BIT_MASK(flag));
 }
 
 #define set_thread_flag(flag) \

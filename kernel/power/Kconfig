@@ -129,6 +129,14 @@ config PM_STD_PARTITION
 	  suspended image to. It will simply pick the first available swap 
 	  device.
 
+config PM_QOS
+	bool "PM QoS framework"
+	default y
+	---help---
+	This interface provides a kernel and user mode interface for
+        registering performance expectations by drivers, subsystems
+        and user space applications.
+
 config PM_SLEEP
 	def_bool y
 	depends on SUSPEND || HIBERNATE_CALLBACKS

@@ -52,8 +52,8 @@ enum pm_qos_req_type {
 };
 
 struct pm_qos_request {
+	unsigned long cpus_affine;
 	enum pm_qos_req_type type;
-	atomic_t cpus_affine;
 #ifdef CONFIG_SMP
 	uint32_t irq;
 	/* Internal structure members */
@@ -131,6 +131,7 @@ static inline int dev_pm_qos_request_active(struct dev_pm_qos_request *req)
 	return req->dev != NULL;
 }
 
+#ifdef CONFIG_PM_QOS
 int pm_qos_update_target(struct pm_qos_constraints *c, struct plist_node *node,
 			 enum pm_qos_req_action action, int value);
 bool pm_qos_update_flags(struct pm_qos_flags *pqf,
@@ -149,6 +150,59 @@ int pm_qos_add_notifier(int pm_qos_class, struct notifier_block *notifier);
 int pm_qos_remove_notifier(int pm_qos_class, struct notifier_block *notifier);
 int pm_qos_request_active(struct pm_qos_request *req);
 s32 pm_qos_read_value(struct pm_qos_constraints *c);
+#else
+static inline int pm_qos_update_target(struct pm_qos_constraints *c, struct plist_node *node,
+			 enum pm_qos_req_action action, int value)
+{
+	return 0;
+}
+static inline bool pm_qos_update_flags(struct pm_qos_flags *pqf,
+			 struct pm_qos_flags_request *req,
+			 enum pm_qos_req_action action, s32 val)
+{
+	return 0;
+}
+static inline void pm_qos_add_request(struct pm_qos_request *req, int pm_qos_class,
+			s32 value)
+{
+}
+static inline void pm_qos_update_request(struct pm_qos_request *req,
+			   s32 new_value)
+{
+}
+static inline void pm_qos_remove_request(struct pm_qos_request *req)
+{
+}
+
+static inline int pm_qos_request(int pm_qos_class)
+{
+	return 0;
+}
+static inline int pm_qos_request_for_cpu(int pm_qos_class, int cpu)
+{
+	return 0;
+}
+static inline int pm_qos_request_for_cpumask(int pm_qos_class, struct cpumask *mask)
+{
+	return 0;
+}
+static inline int pm_qos_add_notifier(int pm_qos_class, struct notifier_block *notifier)
+{
+	return 0;
+}
+static inline int pm_qos_remove_notifier(int pm_qos_class, struct notifier_block *notifier)
+{
+	return 0;
+}
+static inline int pm_qos_request_active(struct pm_qos_request *req)
+{
+	return 0;
+}
+static inline s32 pm_qos_read_value(struct pm_qos_constraints *c)
+{
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_PM
 enum pm_qos_flags_status __dev_pm_qos_flags(struct device *dev, s32 mask);

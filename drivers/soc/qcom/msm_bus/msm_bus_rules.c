@@ -16,7 +16,6 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/msm-bus.h>
-#define CREATE_TRACE_POINTS
 
 struct node_vote_info {
 	int id;

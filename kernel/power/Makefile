@@ -4,7 +4,7 @@ ccflags-$(CONFIG_PM_DEBUG)	:= -DDEBUG
 
 KASAN_SANITIZE_snapshot.o	:= n
 
-obj-y				+= qos.o
+obj-$(CONFIG_PM_QOS)		+= qos.o
 obj-$(CONFIG_PM)		+= main.o
 obj-$(CONFIG_VT_CONSOLE_SLEEP)	+= console.o
 obj-$(CONFIG_FREEZER)		+= process.o
@@ -16,4 +16,4 @@ obj-$(CONFIG_PM_WAKELOCKS)	+= wakelock.o
 
 obj-$(CONFIG_MAGIC_SYSRQ)	+= poweroff.o
 
-obj-$(CONFIG_PM_DEBUG)	+= wakeup_reason.o
+obj-$(CONFIG_SUSPEND)	+= wakeup_reason.o
